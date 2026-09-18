@@ -527,6 +527,23 @@ main { width:100% !important; max-width:none !important; margin:0 !important; pa
 }
 </style>
 
+
+<style id="ajuste-tela-e-icone-final">
+/* Ajuste final solicitado: preencher a tela do celular sem faixas */
+html,body{width:100%;margin:0!important;padding:0!important;overflow-x:hidden!important;}
+@media(max-width:650px){
+  body{background:#fff9ed!important;min-height:100dvh!important;}
+  main{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;}
+  #home{width:100%!important;min-height:100dvh!important;margin:0!important;padding:0!important;}
+  #home .home-cover{width:100%!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#fff9ed!important;}
+  #home .home-cover-img{width:100%!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;display:block!important;object-fit:fill!important;object-position:center top!important;margin:0!important;padding:0!important;border:0!important;}
+}
+@media(min-width:651px){
+  #home .home-cover{width:100%!important;max-width:none!important;margin:0!important;}
+  #home .home-cover-img{width:100%!important;height:auto!important;display:block!important;}
+}
+</style>
+
 </head>
 <body>
 <main>
