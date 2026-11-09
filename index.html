@@ -47,6 +47,10 @@ textarea{min-height:75px;resize:vertical}
 .delete-btn{width:40px;height:40px;border:0;border-radius:12px;background:#f3f5f6;color:#7b8791;font-size:30px;cursor:pointer}
 .empty{text-align:center;color:#78848d;background:#fff;border-radius:15px;padding:25px;margin-top:10px}
 .trip{background:#fff;border-radius:15px;padding:14px;margin:9px 0;box-shadow:0 3px 10px #0001;cursor:pointer}
+.trip-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.trip-info{min-width:0;flex:1}
+.trip-delete{flex:0 0 44px;width:44px;height:44px;border:0;border-radius:12px;background:#fff0f0;color:#b42318;font-size:19px;cursor:pointer;touch-action:manipulation}
+.trip-delete:active{transform:scale(.96)}
 .modal{display:none;position:fixed;inset:0;background:#000b;z-index:10;align-items:center;justify-content:center;padding:20px}
 .modal.show{display:flex}
 .modalbox{position:relative;max-width:95vw;max-height:90vh}
@@ -783,7 +787,7 @@ function renderList(){
  <button class="delete-btn" data-del="${i}">×</button></div>`).join(''):
  '<div class="empty">Sua lista está vazia.<br>Digite um item acima para começar.</div>';
  document.querySelectorAll('[data-check]').forEach(b=>b.onclick=()=>{let i=+b.dataset.check;state.lista[i].done=!state.lista[i].done;save();renderList()});
- document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{state.lista.splice(+b.dataset.del,1);save();renderList()})
+ document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const i=+b.dataset.del;const item=state.lista[i];if(!item)return;if(!confirm(`Excluir "${item.nome}" da lista?`))return;state.lista.splice(i,1);save();renderList()})
 }
 renderList();
 
@@ -830,6 +834,7 @@ function renderPhotos(prefix){
  $(prefix+'Photos').querySelectorAll('[data-photo-delete]').forEach(btn=>btn.onclick=e=>{
    e.stopPropagation();
    const [p,i]=btn.dataset.photoDelete.split(':');
+   if(!confirm('Excluir esta foto?'))return;
    drafts[p].splice(Number(i),1);
    renderPhotos(p);
  });
@@ -851,7 +856,7 @@ function renderM(){
  $('mTotal').textContent='Total: '+money(state.mercado.reduce((a,x)=>a+Number(x.valor||0),0));bindCards('m')
 }
 function editM(i){const x=state.mercado[i];editId=x.id;$('mDate').value=x.data;$('mTime').value=x.hora;$('mMarket').value=x.mercado;$('mValue').value=x.valor;$('mObs').value=x.obs;drafts.m=[...(x.fotos||[])];renderPhotos('m');window.scrollTo(0,0)}
-function delM(i){state.mercado.splice(i,1);save();renderM()}
+async function delM(i){const x=state.mercado[i];if(!x)return;if(!confirm(`Excluir a compra "${x.mercado||'Compra do mercado'}"? Esta ação não poderá ser desfeita.`))return;state.mercado.splice(i,1);await save();await dbPut(state);renderM()}
 
 $('oSave').onclick=async()=>{
  const obj={id:editId||Date.now(),data:$('oDate').value,hora:$('oTime').value,nome:$('oName').value.trim(),valor:Number($('oValue').value||0),obs:$('oObs').value.trim(),fotos:[...drafts.o]};
@@ -865,9 +870,10 @@ function renderO(){
  $('oTotal').textContent='Total: '+money(state.outras.reduce((a,x)=>a+Number(x.valor||0),0));bindCards('o')
 }
 function editO(i){const x=state.outras[i];editId=x.id;$('oDate').value=x.data;$('oTime').value=x.hora;$('oName').value=x.nome;$('oValue').value=x.valor;$('oObs').value=x.obs;drafts.o=[...(x.fotos||[])];renderPhotos('o');window.scrollTo(0,0)}
-function delO(i){state.outras.splice(i,1);save();renderO()}
+async function delO(i){const x=state.outras[i];if(!x)return;if(!confirm(`Excluir a compra "${x.nome||'Compra'}"? Esta ação não poderá ser desfeita.`))return;state.outras.splice(i,1);await save();await dbPut(state);renderO()}
 
 async function deleteSavedPhoto(prefix,itemIndex,photoIndex){
+  if(!confirm('Tem certeza de que deseja excluir esta foto?'))return;
   if(prefix==='m'){
     const item=state.mercado[itemIndex];
     if(!item) return;
@@ -910,8 +916,19 @@ $('tripAdd').onclick=()=>{
   openTrip(0);
 };
 function renderTrips(){
- $('tripList').innerHTML=state.viagens.length?state.viagens.map((x,i)=>`<div class="trip" data-trip="${i}"><b>🚗 ${esc(x.nome)}</b><div class="muted">Total: ${money((x.despesas||[]).reduce((a,d)=>a+Number(d.valor||0),0))}</div></div>`).join(''):'<div class="empty">Nenhuma viagem criada.</div>';
- document.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>openTrip(+b.dataset.trip))
+ $('tripList').innerHTML=state.viagens.length?state.viagens.map((x,i)=>`<div class="trip" data-trip="${i}"><div class="trip-head"><div class="trip-info"><b>🚗 ${esc(x.nome)}</b><div class="muted">Total: ${money((x.despesas||[]).reduce((a,d)=>a+Number(d.valor||0),0))}</div></div><button type="button" class="trip-delete" data-trip-delete="${i}" aria-label="Excluir viagem" title="Excluir viagem">🗑️</button></div></div>`).join(''):'<div class="empty">Nenhuma viagem criada.</div>';
+ document.querySelectorAll('[data-trip]').forEach(b=>b.onclick=e=>{if(e.target.closest('[data-trip-delete]'))return;openTrip(+b.dataset.trip)});
+ document.querySelectorAll('[data-trip-delete]').forEach(b=>b.onclick=async e=>{
+   e.preventDefault();e.stopPropagation();
+   const i=Number(b.dataset.tripDelete), viagem=state.viagens[i];
+   if(!viagem)return;
+   const qtd=(viagem.despesas||[]).length;
+   const detalhe=qtd?` Ela contém ${qtd} gasto(s), que também serão excluídos.`:'';
+   if(!confirm(`Excluir a viagem "${viagem.nome}"?${detalhe} Esta ação não poderá ser desfeita.`))return;
+   state.viagens.splice(i,1);
+   save();await dbPut(state);
+   renderTrips();
+ });
 }
 function openTrip(i){
   if(!state.viagens[i])return;
@@ -937,10 +954,11 @@ function renderT(){
  $('tHistory').innerHTML=arr.length?arr.map((x,i)=>`<div class="item"><div class="item-top"><span>${esc(x.nome||'Gasto')}</span><span>${money(x.valor)}</span></div><div class="muted">${esc(formatDateTime(x.data,x.hora))}</div><div class="photo-row">${(x.fotos||[]).map((s,j)=>`<div class="photo-thumb"><img class="preview" src="${s}" onclick="openPhoto('${s}')"><button type="button" class="photo-remove" onclick="deleteTravelPhoto(${i},${j});event.stopPropagation()" aria-label="Excluir foto">×</button></div>`).join('')}</div><div class="actions"><button class="edit" onclick="editT(${i})">✏️ Editar</button><button class="del" onclick="delT(${i})">🗑️ Excluir</button></div></div>`).join(''):'<div class="empty">Nenhum gasto nesta viagem.</div>'
 }
 function editT(i){const x=state.viagens[tripIndex].despesas[i];$('tName').value=x.nome;$('tValue').value=x.valor;$('tDate').value=x.data;$('tTime').value=x.hora;drafts.t=[...(x.fotos||[])];renderPhotos('t');delT(i,false)}
-function delT(i,rerender=true){state.viagens[tripIndex].despesas.splice(i,1);save();if(rerender)renderT()}
+async function delT(i,rerender=true){const item=state.viagens[tripIndex]?.despesas?.[i];if(!item)return;if(!confirm(`Excluir o gasto "${item.nome||'Gasto da viagem'}"? Esta ação não poderá ser desfeita.`))return;state.viagens[tripIndex].despesas.splice(i,1);await save();await dbPut(state);if(rerender)renderT()}
 async function deleteTravelPhoto(itemIndex,photoIndex){
   const item=state.viagens[tripIndex]?.despesas?.[itemIndex];
   if(!item) return;
+  if(!confirm('Tem certeza de que deseja excluir esta foto?'))return;
   item.fotos=(item.fotos||[]).filter((_,j)=>j!==photoIndex);
   await save(); await dbPut(state); renderT();
 }
